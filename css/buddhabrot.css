@@ -1,0 +1,133 @@
+/* ---------------------------------------------------------------- buddhabrot */
+
+:root {
+  --accent: #d9a23b;
+}
+.art-wrap {
+  aspect-ratio: 1;
+  background: #060402;
+}
+.art-wrap canvas {
+  position: absolute;
+  inset: 0;
+}
+#bb-overlay {
+  cursor: crosshair;
+}
+.art-col .buttons {
+  margin: 14px 0 20px;
+}
+.bar {
+  height: 3px;
+  margin-top: 6px;
+  border-radius: 2px;
+  background: var(--card-border);
+  overflow: hidden;
+}
+#bb-bar {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width 0.25s;
+}
+.orbit-note {
+  min-height: 2.6em;
+  margin: 8px 0 0;
+  font-size: 0.85em;
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+.controls-group {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.rgb-r b::before,
+.rgb-g b::before,
+.rgb-b b::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 6px;
+  border-radius: 50%;
+}
+.rgb-r b::before {
+  background: #ff4b3a;
+}
+.rgb-g b::before {
+  background: #4bdc6a;
+}
+.rgb-b b::before {
+  background: #4b8bff;
+}
+.app-layout button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+#omg-header {
+  z-index: 450;
+}
+
+/* core.css is shared across other projects, so the theme-picker's swatch
+   styling stays untouched there -- this overrides it to render icons
+   (sun/moon/spiral, same set as react-morph-charts' ThemeToggle) instead of
+   plain colored circles, without needing to edit the shared file. */
+#omg-theme-picker {
+  gap: 2px;
+}
+#omg-theme-picker > a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  width: 28px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  background: none;
+  color: currentColor;
+  opacity: 0.75;
+}
+#omg-theme-picker > a:hover {
+  opacity: 1;
+}
+#omg-theme-picker > a.selected {
+  opacity: 1;
+}
+
+/* Theme toggle + GitHub link as one row, anchored top right */
+#omg-header-tools {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+#omg-header-tools #omg-theme-picker {
+  position: static;
+}
+
+/* GitHub link, same look as the theme toggle's icons */
+#omg-github {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: none;
+  opacity: 0.75;
+}
+#omg-github svg {
+  width: 30px;
+  height: 30px;
+}
+html[data-theme="evol-blue"] #omg-github svg {
+  fill: white;
+}
+#omg-github:hover,
+#omg-github:focus-visible {
+  opacity: 1;
+}

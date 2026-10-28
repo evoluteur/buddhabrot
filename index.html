@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <script
+      async
+      src="https://www.googletagmanager.com/gtag/js?id=G-063933E3C2"
+    ></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      gtag("js", new Date());
+      gtag("config", "G-063933E3C2");
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Buddhabrot: the Mandelbrot Set's Hidden Buddha, Nebulabrot and Anti-Buddhabrot</title>
+    <meta
+      name="description"
+      content="Buddhabrot generator: millions of escaping orbits of the Mandelbrot set, counted pixel by pixel, reveal a seated Buddha. Render the Buddhabrot, the colored Nebulabrot and the Anti-Buddhabrot in your browser, trace the orbit of any point, and download PNG."
+    />
+    <meta name="author" content="Olivier Giulieri" />
+    <link rel="canonical" href="https://evoluteur.github.io/buddhabrot/" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+    <meta name="theme-color" content="#1a212d" />
+    <meta property="og:site_name" content="Buddhabrot" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Buddhabrot" />
+    <meta
+      property="og:description"
+      content="The Buddha hidden in the Mandelbrot set: millions of escaping orbits drawn as a long exposure, with the Nebulabrot and the Anti-Buddhabrot."
+    />
+    <meta property="og:url" content="https://evoluteur.github.io/buddhabrot/" />
+    <meta property="og:image" content="https://evoluteur.github.io/buddhabrot/buddhabrot.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css?family=Overpass"
+    />
+    <link id="omg-core-css" rel="stylesheet" href="css/core.css" />
+    <script>
+      // Themes (dark, light, evol-blue) are copies of omg-themes; set OMG_THEMES_BASE to link the hosted ones instead.
+      window.OMG_THEMES_BASE = ""; // or "https://evoluteur.github.io/omg-themes/" to link the hosted themes
+      window.OMG_DEFAULT_THEME = "dark";
+      (function () {
+        var t = window.OMG_DEFAULT_THEME;
+        try {
+          t = localStorage.getItem("omg-theme") || t;
+        } catch (e) {}
+        if (t !== "dark" && t !== "light" && t !== "evol-blue")
+          t = window.OMG_DEFAULT_THEME;
+        document.documentElement.setAttribute("data-theme", t);
+        // written here (not in the markup) so the saved theme loads before first paint
+        document.write(
+          '<link id="omg-theme-css" rel="stylesheet" href="' +
+            window.OMG_THEMES_BASE +
+            "css/themes/" +
+            t +
+            "/" +
+            t +
+            '.css" />',
+        );
+      })();
+    </script>
+    <link id="omg-density-css" rel="stylesheet" href="css/densities.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="css/buddhabrot.css" />
+
+    <script src="js/omg.js"></script>
+    <script src="js/buddhabrot.js"></script>
+    <script>
+      if ("serviceWorker" in navigator && location.protocol !== "file:") {
+        addEventListener("load", () =>
+          navigator.serviceWorker.register("sw.js"),
+        );
+      }
+    </script>
+  </head>
+
+  <body
+    onload="
+      setupPage('home');
+      initBuddhabrot();
+    "
+    id="omg-body" class="medium"
+  >
+    <div id="omg-header">
+      <h1>Buddhabrot</h1>
+      <div id="omg-header-tools">
+        <div id="omg-theme-picker"></div>
+        <a
+          id="omg-github"
+          href="https://github.com/evoluteur/buddhabrot"
+          target="_blank"
+          rel="noopener"
+          title="Buddhabrot on GitHub"
+          aria-label="Buddhabrot on GitHub"
+          ><svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" /></svg
+        ></a>
+      </div>
+    </div>
+    <h2>The Buddha hidden in the Mandelbrot set</h2>
+    <div class="content">
+      <div class="app-layout">
+        <div class="art-col">
+          <div class="art-wrap">
+            <canvas id="bb-canvas" aria-label="Buddhabrot"></canvas>
+            <canvas id="bb-overlay" aria-hidden="true"></canvas>
+          </div>
+          <div class="bar"><div id="bb-bar"></div></div>
+          <p class="orbit-note" id="bb-orbit"></p>
+          <div class="buttons">
+            <button type="button" id="bb-preset">Next preset</button>
+            <button type="button" id="bb-pause" class="secondary">Pause</button>
+            <button type="button" id="bb-png" class="secondary">Download PNG</button>
+          </div>
+        </div>
+        <div class="controls">
+          <label>Draw <select id="bb-kind"></select></label>
+          <p class="hint" id="bb-note"></p>
+          <div id="bb-single" class="controls-group">
+            <label
+              ><span>Max iterations <b id="bb-max-val"></b></span>
+              <input id="bb-max" type="range" min="0" step="1" value="6"
+            /></label>
+          </div>
+          <div id="bb-rgb" class="controls-group" hidden>
+            <label class="rgb-r"
+              ><span>Red: orbits up to <b id="bb-r-val"></b></span>
+              <input id="bb-r" type="range" min="0" step="1" value="8"
+            /></label>
+            <label class="rgb-g"
+              ><span>Green: up to <b id="bb-g-val"></b></span>
+              <input id="bb-g" type="range" min="0" step="1" value="5"
+            /></label>
+            <label class="rgb-b"
+              ><span>Blue: up to <b id="bb-b-val"></b></span>
+              <input id="bb-b" type="range" min="0" step="1" value="2"
+            /></label>
+          </div>
+          <label id="bb-min-label"
+            ><span>Skip orbits shorter than <b id="bb-min-val"></b></span>
+            <input id="bb-min" type="range" min="0" step="1" value="4"
+          /></label>
+          <label id="bb-palette-label">Colors <select id="bb-palette"></select></label>
+          <label>Exposure <input id="bb-exposure" type="range" min="0.3" max="3" step="0.05" value="1" /></label>
+          <label>Contrast <input id="bb-contrast" type="range" min="0.25" max="1.2" step="0.05" value="0.6" /></label>
+          <label
+            >Orientation
+            <select id="bb-orient">
+              <option value="seated">Seated Buddha</option>
+              <option value="mandelbrot">Like the Mandelbrot set</option>
+            </select></label
+          >
+          <label
+            >Resolution
+            <select id="bb-res">
+              <option value="800">800 × 800</option>
+              <option value="1600">1600 × 1600 (to print)</option>
+            </select></label
+          >
+          <label class="check"><input id="bb-trace" type="checkbox" checked /> Show the orbit under the pointer</label>
+          <label class="check"><input id="bb-set" type="checkbox" /> Outline the Mandelbrot set</label>
+          <p class="hint"><span id="bb-info"></span> The address of the page keeps the settings, to share them.</p>
+        </div>
+      </div>
+
+      <h3>Where the escaping points go</h3>
+      <div class="explain">
+        <p>
+          The Mandelbrot set is made by taking a point <em>c</em> of the
+          plane, starting from <em>z</em> = 0, and repeating
+          <em>z</em> → <em>z</em>² + <em>c</em>. For some points the numbers
+          stay small forever: they are in the set, the black shape of the
+          famous pictures. For the others the numbers grow and run off to
+          infinity, and the usual picture colors each one by how fast it
+          escapes.
+        </p>
+        <p>
+          In 1993 Melinda Green asked a different question: not
+          <em>how fast</em> a point escapes, but <em>where it goes</em> on
+          the way out. Take millions of random points, follow the path, the
+          <em>orbit</em>, of each one that escapes, and count how many times
+          those paths pass through every pixel. Shown as a long exposure,
+          the counts reveal a figure seated in meditation, with a head, a
+          halo and folded hands. Lori Gardi named it the
+          <em>Buddhabrot</em>. Move the pointer over the picture to see the
+          orbit of the point under it: each dot is one step.
+        </p>
+        <p>
+          <strong>Max iterations</strong> sets how long an orbit may wander
+          before it counts as never escaping. With a few dozen you get a
+          soft ghost; with thousands, the long orbits that start close to
+          the edge of the set draw fine threads and filaments. The
+          <strong>Nebulabrot</strong> renders three Buddhabrots at once, with
+          different limits, in red, green and blue, the way astronomers
+          color the filters of a Hubble photograph. The
+          <strong>Anti-Buddhabrot</strong> does the opposite and draws only
+          the orbits that never escape: they settle into loops around the
+          points of the set.
+        </p>
+        <p>
+          The picture is computed in your browser by as many workers as your
+          processor has cores, and stops by itself once its brightest parts
+          have collected a few thousand points per pixel, when more would
+          not show. The figure is symmetric, so each orbit is drawn twice,
+          mirrored, and the points inside the main cardioid and the big
+          disk, which are known never to escape, are skipped.
+        </p>
+      </div>
+
+      <div class="footer">
+        <p>
+          Buddhabrot is open source on
+          <a href="https://github.com/evoluteur/buddhabrot">GitHub</a>
+          with an MIT license.
+        </p>
+        <p>
+          Had fun browsing the app?
+          <a href="https://github.com/sponsors/evoluteur"
+            >Buy me a coffee by becoming a sponsor</a
+          >.
+        </p>
+        <p>
+          You may also enjoy
+          <a href="https://evoluteur.github.io/mandelbrot-julia/">Mandelbrot and Julia</a>,
+          <a href="https://evoluteur.github.io/strange-attractors/">Strange Attractors</a>,
+          <a href="https://evoluteur.github.io/apollonian-gasket/">Apollonian Gasket</a>,
+          <a href="https://evoluteur.github.io/lightning-and-coral/">Lightning and Coral</a>
+          and
+          <a href="https://evoluteur.github.io/flow-fields/">Flow Fields</a>.
+          See them all on
+          <a href="https://evoluteur.github.io/generative-art.html">Generative Art</a>.
+        </p>
+        <p class="copyright">
+          &#169; 2026
+          <a href="https://evoluteur.github.io/">Olivier Giulieri</a>
+        </p>
+      </div>
+    </div>
+  </body>
+</html>

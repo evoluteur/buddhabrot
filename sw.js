@@ -1,0 +1,88 @@
+const CACHE = "buddhabrot-v1";
+const ASSETS = [
+  "./",
+  "index.html",
+  "css/app.css",
+  "css/core.css",
+  "css/densities.css",
+  "css/buddhabrot.css",
+  "css/themes/dark/bg0.png",
+  "css/themes/dark/dark.css",
+  "css/themes/evol-blue/evol-blue.css",
+  "css/themes/evol-blue/spirals.png",
+  "css/themes/light/bg0.png",
+  "css/themes/light/light.css",
+  "favicon.png",
+  "icon-192.png",
+  "icon-512.png",
+  "buddhabrot.png",
+  "js/omg.js",
+  "js/buddhabrot.js",
+  "manifest.json",
+];
+
+self.addEventListener("install", (e) => {
+  // "reload" bypasses the HTTP cache, so an update never caches stale files
+  e.waitUntil(
+    caches
+      .open(CACHE)
+      .then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: "reload" })))),
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (e) => {
+  e.waitUntil(
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))),
+      ),
+  );
+  self.clients.claim();
+});
+
+self.addEventListener("fetch", (e) => {
+  const url = new URL(e.request.url);
+  const cacheable =
+    url.origin === location.origin ||
+    url.hostname === "fonts.googleapis.com" ||
+    url.hostname === "fonts.gstatic.com";
+  if (e.request.method !== "GET" || !cacheable) return;
+  // pages: the network first, so an update shows up at once; the saved copy
+  // only when offline
+  if (e.request.mode === "navigate") {
+    e.respondWith(
+      fetch(e.request)
+        .then((res) => {
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(e.request, copy));
+          }
+          return res;
+        })
+        .catch(() =>
+          caches
+            .match(e.request, { ignoreSearch: true })
+            .then((cached) => cached || caches.match("index.html")),
+        ),
+    );
+    return;
+  }
+  // everything else: the saved copy first, the network for what is missing
+  e.respondWith(
+    caches.match(e.request).then(
+      (cached) =>
+        cached ||
+        fetch(e.request)
+          .then((res) => {
+            if (res.ok) {
+              const copy = res.clone();
+              caches.open(CACHE).then((c) => c.put(e.request, copy));
+            }
+            return res;
+          })
+          .catch(() => undefined),
+    ),
+  );
+});

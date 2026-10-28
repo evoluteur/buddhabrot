@@ -1,0 +1,24 @@
+{
+  "name": "Buddhabrot",
+  "short_name": "Buddhabrot",
+  "description": "The Buddha hidden in the Mandelbrot set: millions of escaping orbits drawn as a long exposure, with the Nebulabrot and the Anti-Buddhabrot.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1a212d",
+  "theme_color": "#1a212d",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
