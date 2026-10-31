@@ -89,17 +89,60 @@ const bbSeated = () => bbEl("bb-orient").value === "seated";
 // The worker's code, run from a Blob so the page also works from a file.
 // It sends the pixels hit as a list of numbers (pixel index × 8 + one bit per
 // channel), in buffers that the page sends back once added up.
+//
+// Most random points are useless: deep inside the set they never escape, far
+// outside they escape before the minimum orbit length. So the half-disk where
+// points are taken is first cut into cells (BB_MAP), each one probed on a
+// small grid, and points are then drawn only in the cells that can
+// contribute. Every cell has the same area, so the points are still uniform
+// over the cells kept, and the picture is the same, only faster.
 function bbWorkerCode() {
   let P = null;
   let ore;
   let oim;
+  let cells = null; // the cells to draw points in
   const pool = [];
   let waiting = false;
 
+  // the escape step of c, or -1 when the orbit falls into a cycle (it never
+  // escapes), or -2 when it did neither within max steps
+  const probe = (cr, ci, max) => {
+    const q = (cr - 0.25) * (cr - 0.25) + ci * ci;
+    if (q * (q + (cr - 0.25)) < 0.25 * ci * ci) return -1;
+    if ((cr + 1) * (cr + 1) + ci * ci < 0.0625) return -1;
+    let zr = 0;
+    let zi = 0;
+    let pr = 0;
+    let pi = 0;
+    let next = 8;
+    for (let i = 0; i < max; i++) {
+      const zr2 = zr * zr;
+      const zi2 = zi * zi;
+      if (zr2 + zi2 > 4) return i;
+      zi = 2 * zr * zi + ci;
+      zr = zr2 - zi2 + cr;
+      if (zr === pr && zi === pi) return -1;
+      if (i === next) {
+        pr = zr;
+        pi = zi;
+        next *= 2;
+      }
+    }
+    return -2;
+  };
+
   onmessage = (e) => {
     const m = e.data;
-    if (m.type === "start") {
+    if (m.type === "map") {
+      // this worker's share of the rows of probes
+      const { cols, rows, step, part, parts, max } = m;
+      const out = new Int32Array(cols * rows);
+      for (let y = part; y < rows; y += parts)
+        for (let x = 0; x < cols; x++) out[y * cols + x] = probe(-2 + x * step, y * step, max);
+      postMessage({ type: "map", part, buf: out.buffer }, [out.buffer]);
+    } else if (m.type === "start") {
       P = m;
+      cells = new Int32Array(m.cells);
       ore = new Float64Array(P.max + 1);
       oim = new Float64Array(P.max + 1);
       for (let i = 0; i < 3; i++) pool.push(new Uint32Array(1 << 20));
@@ -119,9 +162,10 @@ function bbWorkerCode() {
       return;
     }
     const buf = pool.pop();
-    const { N, x0, y0, span, seated, escape, lims, min, max } = P;
+    const { N, x0, y0, span, seated, escape, lims, min, max, mapCols, cellSize } = P;
     const k = N / span;
     const nl = lims.length;
+    const nc = cells.length;
     const room = buf.length - 2 * max - 4;
     const t0 = performance.now();
     let n = 0;
@@ -130,8 +174,11 @@ function bbWorkerCode() {
     while (n < room && performance.now() - t0 < 60) {
       for (let s = 0; s < 500 && n < room; s++) {
         samples++;
-        const cr = Math.random() * 4 - 2;
-        const ci = Math.random() * 2; // the other half is the mirror image
+        // a random point in a random cell (the lower half of the plane is
+        // the mirror image)
+        const cell = cells[(Math.random() * nc) | 0];
+        const cr = -2 + ((cell % mapCols) + Math.random()) * cellSize;
+        const ci = (((cell / mapCols) | 0) + Math.random()) * cellSize;
         if (cr * cr + ci * ci > 4) continue;
         if (escape) {
           // the main cardioid and the big disk never escape: skip them
@@ -142,14 +189,40 @@ function bbWorkerCode() {
         let zr = 0;
         let zi = 0;
         let i = 0;
-        for (; i < max; i++) {
-          const zr2 = zr * zr;
-          const zi2 = zi * zi;
-          if (zr2 + zi2 > 4) break;
-          zi = 2 * zr * zi + ci;
-          zr = zr2 - zi2 + cr;
-          ore[i] = zr;
-          oim[i] = zi;
+        if (escape) {
+          // stop as soon as the orbit falls into a cycle: it will never
+          // escape (compared with a copy kept at steps 8, 16, 32...)
+          let pr = 0;
+          let pi = 0;
+          let next = 8;
+          for (; i < max; i++) {
+            const zr2 = zr * zr;
+            const zi2 = zi * zi;
+            if (zr2 + zi2 > 4) break;
+            zi = 2 * zr * zi + ci;
+            zr = zr2 - zi2 + cr;
+            ore[i] = zr;
+            oim[i] = zi;
+            if (zr === pr && zi === pi) {
+              i = max;
+              break;
+            }
+            if (i === next) {
+              pr = zr;
+              pi = zi;
+              next *= 2;
+            }
+          }
+        } else {
+          for (; i < max; i++) {
+            const zr2 = zr * zr;
+            const zi2 = zi * zi;
+            if (zr2 + zi2 > 4) break;
+            zi = 2 * zr * zi + ci;
+            zr = zr2 - zi2 + cr;
+            ore[i] = zr;
+            oim[i] = zi;
+          }
         }
         const escaped = i < max;
         let mask = 1;
@@ -196,6 +269,51 @@ const BB_WORKER_URL = URL.createObjectURL(
 
 const bbWorkerCount = () => Math.max(1, Math.min(8, (navigator.hardwareConcurrency || 4) - 1));
 
+// the cells of the half-disk where points are taken, re in [-2, 2], im in
+// [0, 2], each probed on a (sub + 1)² grid shared with its neighbors
+const BB_MAP = { cols: 512, rows: 256, sub: 2 };
+BB_MAP.size = 4 / BB_MAP.cols;
+BB.maps = new Map(); // the cells kept, by escape, min and max
+
+const bbMapKey = (job) => `${job.escape}|${job.min}|${job.max}`;
+
+// the cells that can contribute: where a probe escapes late enough to draw
+// something (or, for the Anti-Buddhabrot, never escapes), where the edge of
+// the set passes, or where a probe is undecided; and their neighbors, for
+// what falls between the probes
+const bbCells = (codes, escape, min) => {
+  const { cols, rows, sub } = BB_MAP;
+  const pc = cols * sub + 1;
+  const low = Math.max(min, 3); // escaping in fewer than 3 steps draws nothing
+  const use = new Uint8Array(cols * rows);
+  for (let cy = 0; cy < rows; cy++)
+    for (let cx = 0; cx < cols; cx++) {
+      let out = false;
+      let inside = false;
+      let keep = false;
+      for (let sy = 0; sy <= sub; sy++)
+        for (let sx = 0; sx <= sub; sx++) {
+          const v = codes[(cy * sub + sy) * pc + cx * sub + sx];
+          if (v === -2) keep = true;
+          else if (v === -1) inside = true;
+          else {
+            out = true;
+            if (escape && v >= low) keep = true;
+          }
+        }
+      use[cy * cols + cx] = keep || (inside && (out || !escape)) ? 1 : 0;
+    }
+  const list = [];
+  for (let cy = 0; cy < rows; cy++)
+    for (let cx = 0; cx < cols; cx++) {
+      let near = 0;
+      for (let y = Math.max(0, cy - 1); y <= Math.min(rows - 1, cy + 1) && !near; y++)
+        for (let x = Math.max(0, cx - 1); x <= Math.min(cols - 1, cx + 1); x++) near |= use[y * cols + x];
+      if (near) list.push(cy * cols + cx);
+    }
+  return Int32Array.from(list);
+};
+
 const bbStopWorkers = () => {
   BB.workers.forEach((w) => w.terminate());
   BB.workers = [];
@@ -219,6 +337,8 @@ const bbJob = () => {
     lims,
     max: Math.max(...lims),
     min: K.escape ? BB_MINS[+bbEl("bb-min").value] : 0,
+    mapCols: BB_MAP.cols,
+    cellSize: BB_MAP.size,
   };
 };
 
@@ -226,17 +346,39 @@ const bbStartWorkers = () => {
   bbStopWorkers();
   if (!BB.running || BB.settled || document.hidden) return;
   const job = bbJob();
+  const key = bbMapKey(job);
   const gen = BB.gen;
+  const ws = [];
+  const go = (cells) => ws.forEach((w) => w.postMessage({ ...job, cells: cells.buffer }));
+  // the map first, computed by all the workers, each one a share of the rows
+  const { cols, rows, sub, size } = BB_MAP;
+  const pc = cols * sub + 1;
+  const pr = rows * sub + 1;
+  const codes = BB.maps.has(key) ? null : new Int32Array(pc * pr);
+  let parts = 0;
+  const onMap = (m) => {
+    const a = new Int32Array(m.buf);
+    for (let y = m.part; y < pr; y += ws.length) codes.set(a.subarray(y * pc, (y + 1) * pc), y * pc);
+    if (++parts < ws.length) return;
+    BB.maps.set(key, bbCells(codes, job.escape, job.min));
+    if (BB.maps.size > 24) BB.maps.delete(BB.maps.keys().next().value);
+    go(BB.maps.get(key));
+  };
   for (let i = 0; i < bbWorkerCount(); i++) {
     const w = new Worker(BB_WORKER_URL);
-    w.onmessage = (e) => bbOnHits(e.data, w, gen);
-    w.postMessage(job);
-    BB.workers.push(w);
+    w.onmessage = (e) => {
+      if (gen !== BB.gen) return;
+      if (e.data.type === "map") onMap(e.data);
+      else bbOnHits(e.data, w);
+    };
+    ws.push(w);
   }
+  BB.workers = ws;
+  if (codes) ws.forEach((w, i) => w.postMessage({ type: "map", cols: pc, rows: pr, step: size / sub, part: i, parts: ws.length, max: job.max }));
+  else go(BB.maps.get(key));
 };
 
-const bbOnHits = (m, w, gen) => {
-  if (gen !== BB.gen) return;
+const bbOnHits = (m, w) => {
   const a = new Uint32Array(m.buf);
   const n = m.n;
   const H = BB.hist;
@@ -281,12 +423,14 @@ const bbBuildLUT = () => {
 // The brightest pixels (along the real axis) would make all the rest dark:
 // the white point is set at a high percentile of the lit pixels instead.
 // Also returns the count of an ordinary lit pixel (90th percentile), to tell
-// when the faint parts are smooth too.
+// when the faint parts are smooth too. The pixels looked at are always the
+// same ones, so the brightness does not flicker from one render to the next.
 const bbLevels = (h) => {
   const N = h.length;
+  const step = Math.max(1, Math.floor(N / 30000)) | 1; // odd: not along a column
   const s = [];
-  for (let i = 0; i < 30000; i++) {
-    const v = h[(Math.random() * N) | 0];
+  for (let i = step >> 1; i < N; i += step) {
+    const v = h[i];
     if (v) s.push(v);
   }
   if (s.length < 20) return [1, 0];
@@ -529,15 +673,25 @@ const bbDrawOrbit = (ctx, W, o) => {
     : `${c} never escapes: it is in the Mandelbrot set, and its orbit feeds the Anti-Buddhabrot.`;
 };
 
+// at most one orbit drawn per frame, however fast the pointer moves
+let bbTraceAt = null;
+let bbTraceRaf = 0;
 const bbTrace = (e) => {
   if (!bbEl("bb-trace").checked) return;
-  const r = bbEl("bb-overlay").getBoundingClientRect();
-  const u = (e.clientX - r.left) / r.width;
-  const v = (e.clientY - r.top) / r.height;
-  if (u < 0 || v < 0 || u > 1 || v > 1) return bbUntrace();
-  bbDrawSet(bbOrbit(...bbToC(u, v)));
+  bbTraceAt = [e.clientX, e.clientY];
+  if (bbTraceRaf) return;
+  bbTraceRaf = requestAnimationFrame(() => {
+    bbTraceRaf = 0;
+    if (!bbTraceAt) return;
+    const r = bbEl("bb-overlay").getBoundingClientRect();
+    const u = (bbTraceAt[0] - r.left) / r.width;
+    const v = (bbTraceAt[1] - r.top) / r.height;
+    if (u < 0 || v < 0 || u > 1 || v > 1) return bbUntrace();
+    bbDrawSet(bbOrbit(...bbToC(u, v)));
+  });
 };
 const bbUntrace = () => {
+  bbTraceAt = null;
   bbEl("bb-orbit").textContent = "";
   bbDrawSet();
 };
@@ -559,9 +713,26 @@ const bbShowKind = () => {
 };
 
 const BB_KEYS = ["kind", "max", "min", "r", "g", "b", "palette", "exposure", "contrast", "orient", "res"];
+// written a moment after the last change: browsers limit how often the
+// address may change (Safari throws past 100 times in 10 s, easily reached
+// by dragging a slider)
+let bbHashTimer = 0;
 const bbWriteHash = () => {
-  const q = BB_KEYS.map((k) => `${k}=${encodeURIComponent(bbEl("bb-" + k).value)}`);
-  history.replaceState(null, "", "#" + q.join("&"));
+  clearTimeout(bbHashTimer);
+  bbHashTimer = setTimeout(() => {
+    const q = BB_KEYS.map((k) => `${k}=${encodeURIComponent(bbEl("bb-" + k).value)}`);
+    history.replaceState(null, "", "#" + q.join("&"));
+  }, 300);
+};
+
+// a slider fires many events per frame: render once per frame
+let bbRenderRaf = 0;
+const bbRenderSoon = () => {
+  if (!bbRenderRaf)
+    bbRenderRaf = requestAnimationFrame(() => {
+      bbRenderRaf = 0;
+      bbRender();
+    });
 };
 
 const bbSetIter = (id, v, list = BB_ITERS) => {
@@ -633,7 +804,7 @@ const initBuddhabrot = () => {
   });
   ["bb-exposure", "bb-contrast"].forEach((id) =>
     bbEl(id).addEventListener("input", () => {
-      bbRender();
+      bbRenderSoon();
       bbWriteHash();
     }),
   );
@@ -648,6 +819,7 @@ const initBuddhabrot = () => {
       a.href = URL.createObjectURL(b);
       a.download = `${bbEl("bb-kind").value.toLowerCase()}.png`;
       a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }),
   );
   bbEl("bb-set").addEventListener("change", () => bbDrawSet());
