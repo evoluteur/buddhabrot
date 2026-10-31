@@ -210,7 +210,10 @@
           have collected a few thousand points per pixel, when more would
           not show. The figure is symmetric, so each orbit is drawn twice,
           mirrored, and the points inside the main cardioid and the big
-          disk, which are known never to escape, are skipped.
+          disk, which are known never to escape, are skipped. A first quick pass
+          also maps where the useful points are, so the random points are
+          taken only there, and an orbit that starts going round in a cycle
+          is dropped at once: it will never escape.
         </p>
       </div>
 

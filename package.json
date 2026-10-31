@@ -1,7 +1,7 @@
 {
   "name": "buddhabrot",
   "version": "1.0.0",
-  "description": "Buddhabrot: millions of escaping orbits of the Mandelbrot set, counted pixel by pixel, reveal a seated Buddha. The Buddhabrot, the Nebulabrot and the Anti-Buddhabrot, rendered with Web Workers; trace the orbit of any point, and download PNG.",
+  "description": "Millions of escaping orbits of the Mandelbrot set, counted pixel by pixel, reveal a seated Buddha. The Buddhabrot, the Nebulabrot and the Anti-Buddhabrot, rendered with Web Workers; trace the orbit of any point, and download PNG.",
   "repository": "github:evoluteur/buddhabrot",
   "homepage": "https://evoluteur.github.io/buddhabrot/",
   "copyright": "(c) 2026 Olivier Giulieri",
